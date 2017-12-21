@@ -1,9 +1,9 @@
-package com.f2prateek.rx.preferences;
+package com.f2prateek.rx.preferences2;
 
 import android.content.SharedPreferences;
 import android.support.annotation.NonNull;
 
-final class EnumAdapter<T extends Enum<T>> implements Preference.Adapter<T> {
+final class EnumAdapter<T extends Enum<T>> implements RealPreference.Adapter<T> {
   private final Class<T> enumClass;
 
   EnumAdapter(Class<T> enumClass) {

@@ -1,4 +1,4 @@
-package com.f2prateek.rx.preferences;
+package com.f2prateek.rx.preferences2;
 
 import android.annotation.SuppressLint;
 import android.content.SharedPreferences;
@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.fail;
 
 @RunWith(RobolectricTestRunner.class) //
-@SuppressLint("CommitPrefEdits") //
+@SuppressLint("ApplySharedPref") //
 @SuppressWarnings({ "ResourceType", "ConstantConditions" }) //
 public class RxSharedPreferencesTest {
   private RxSharedPreferences rxPreferences;
@@ -23,6 +23,13 @@ public class RxSharedPreferencesTest {
     SharedPreferences preferences = getDefaultSharedPreferences(RuntimeEnvironment.application);
     preferences.edit().clear().commit();
     rxPreferences = RxSharedPreferences.create(preferences);
+  }
+
+  @Test public void clearRemovesAllPreferences() {
+    Preference<String> preference = rxPreferences.getString("key", "default");
+    preference.set("foo");
+    rxPreferences.clear();
+    assertThat(preference.get()).isEqualTo("default");
   }
 
   @Test public void createWithNullThrows() {
@@ -49,13 +56,16 @@ public class RxSharedPreferencesTest {
     }
   }
 
-  @Test public void enumNullKeyThrows() {
+  @Test public void booleanNullDefaultValueThrows() {
     try {
-      rxPreferences.getEnum(null, Roshambo.class);
+      rxPreferences.getBoolean("key", null);
       fail();
     } catch (NullPointerException e) {
-      assertThat(e).hasMessage("key == null");
+      assertThat(e).hasMessage("defaultValue == null");
     }
+  }
+
+  @Test public void enumNullKeyThrows() {
     try {
       rxPreferences.getEnum(null, Roshambo.ROCK, Roshambo.class);
       fail();
@@ -66,16 +76,19 @@ public class RxSharedPreferencesTest {
 
   @Test public void enumNullClassThrows() {
     try {
-      rxPreferences.getEnum("key", null);
-      fail();
-    } catch (NullPointerException e) {
-      assertThat(e).hasMessage("enumClass == null");
-    }
-    try {
       rxPreferences.getEnum("key", Roshambo.ROCK, null);
       fail();
     } catch (NullPointerException e) {
       assertThat(e).hasMessage("enumClass == null");
+    }
+  }
+
+  @Test public void enumNullDefaultValueThrows() {
+    try {
+      rxPreferences.getEnum("key", null, Roshambo.class);
+      fail();
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("defaultValue == null");
     }
   }
 
@@ -94,6 +107,15 @@ public class RxSharedPreferencesTest {
     }
   }
 
+  @Test public void floatNullDefaultValueThrows() {
+    try {
+      rxPreferences.getFloat("key", null);
+      fail();
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("defaultValue == null");
+    }
+  }
+
   @Test public void integerNullKeyThrows() {
     try {
       rxPreferences.getInteger(null);
@@ -106,6 +128,15 @@ public class RxSharedPreferencesTest {
       fail();
     } catch (NullPointerException e) {
       assertThat(e).hasMessage("key == null");
+    }
+  }
+
+  @Test public void integerNullDefaultValueThrows() {
+    try {
+      rxPreferences.getInteger("key", null);
+      fail();
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("defaultValue == null");
     }
   }
 
@@ -124,15 +155,18 @@ public class RxSharedPreferencesTest {
     }
   }
 
-  @Test public void objectNullKeyThrows() {
+  @Test public void longNullDefaultValueThrows() {
     try {
-      rxPreferences.getObject(null, new PointPreferenceAdapter());
+      rxPreferences.getLong("key", null);
       fail();
     } catch (NullPointerException e) {
-      assertThat(e).hasMessage("key == null");
+      assertThat(e).hasMessage("defaultValue == null");
     }
+  }
+
+  @Test public void objectNullKeyThrows() {
     try {
-      rxPreferences.getObject(null, new Point(1, 2), new PointPreferenceAdapter());
+      rxPreferences.getObject(null, new Point(1, 2), new PointPreferenceConverter());
       fail();
     } catch (NullPointerException e) {
       assertThat(e).hasMessage("key == null");
@@ -141,16 +175,19 @@ public class RxSharedPreferencesTest {
 
   @Test public void objectNullAdapterThrows() {
     try {
-      rxPreferences.getObject("key", null);
-      fail();
-    } catch (NullPointerException e) {
-      assertThat(e).hasMessage("adapter == null");
-    }
-    try {
       rxPreferences.getObject("key", new Point(1, 2), null);
       fail();
     } catch (NullPointerException e) {
-      assertThat(e).hasMessage("adapter == null");
+      assertThat(e).hasMessage("converter == null");
+    }
+  }
+
+  @Test public void objectNullDefaultValueThrows() {
+    try {
+      rxPreferences.getObject("key", null, new PointPreferenceConverter());
+      fail();
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("defaultValue == null");
     }
   }
 
@@ -169,6 +206,15 @@ public class RxSharedPreferencesTest {
     }
   }
 
+  @Test public void stringNullDefaultValueThrows() {
+    try {
+      rxPreferences.getString("key", null);
+      fail();
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("defaultValue == null");
+    }
+  }
+
   @Test public void stringSetNullKeyThrows() {
     try {
       rxPreferences.getStringSet(null);
@@ -181,6 +227,15 @@ public class RxSharedPreferencesTest {
       fail();
     } catch (NullPointerException e) {
       assertThat(e).hasMessage("key == null");
+    }
+  }
+
+  @Test public void stringSetNullDefaultValueThrows() {
+    try {
+      rxPreferences.getStringSet("key", null);
+      fail();
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("defaultValue == null");
     }
   }
 }

@@ -1,25 +1,31 @@
-package com.f2prateek.rx.preferences;
+package com.f2prateek.rx.preferences2;
 
 import android.annotation.SuppressLint;
 import android.content.SharedPreferences;
+import android.support.annotation.NonNull;
+import io.reactivex.functions.Consumer;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
-import rx.Subscription;
-import rx.functions.Action1;
-import rx.observers.TestSubscriber;
 
 import static android.preference.PreferenceManager.getDefaultSharedPreferences;
-import static com.f2prateek.rx.preferences.Roshambo.ROCK;
+import static com.f2prateek.rx.preferences2.Roshambo.PAPER;
+import static com.f2prateek.rx.preferences2.Roshambo.ROCK;
 import static java.util.Collections.singleton;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 @RunWith(RobolectricTestRunner.class) //
-@SuppressLint({ "NewApi", "CommitPrefEdits" }) //
+@SuppressLint({ "NewApi", "ApplySharedPref" }) //
 public class PreferenceTest {
-  private final PointPreferenceAdapter pointAdapter = new PointPreferenceAdapter();
+  @Rule public final RecordingObserver.Rule observerRule = new RecordingObserver.Rule();
+
+  private final PointPreferenceConverter pointConverter = new PointPreferenceConverter();
 
   private SharedPreferences preferences;
   private RxSharedPreferences rxPreferences;
@@ -37,13 +43,11 @@ public class PreferenceTest {
 
   @Test public void defaultDefaultValue() {
     assertThat(rxPreferences.getBoolean("foo1").defaultValue()).isFalse();
-    assertThat(rxPreferences.getEnum("foo2", Roshambo.class).defaultValue()).isNull();
     assertThat(rxPreferences.getFloat("foo3").defaultValue()).isZero();
     assertThat(rxPreferences.getInteger("foo4").defaultValue()).isZero();
     assertThat(rxPreferences.getLong("foo5").defaultValue()).isZero();
-    assertThat(rxPreferences.getString("foo6").defaultValue()).isNull();
+    assertThat(rxPreferences.getString("foo6").defaultValue()).isEqualTo("");
     assertThat(rxPreferences.getStringSet("foo7").defaultValue()).isEmpty();
-    assertThat(rxPreferences.getObject("foo8", pointAdapter).defaultValue()).isNull();
   }
 
   @Test public void defaultValue() {
@@ -55,7 +59,7 @@ public class PreferenceTest {
     assertThat(rxPreferences.getString("foo6", "bar").defaultValue()).isEqualTo("bar");
     assertThat(rxPreferences.getStringSet("foo7", singleton("bar")).defaultValue()) //
         .isEqualTo(singleton("bar"));
-    assertThat(rxPreferences.getObject("foo8", new Point(1, 2), pointAdapter).defaultValue()) //
+    assertThat(rxPreferences.getObject("foo8", new Point(1, 2), pointConverter).defaultValue()) //
         .isEqualTo(new Point(1, 2));
   }
 
@@ -68,7 +72,7 @@ public class PreferenceTest {
     assertThat(rxPreferences.getString("foo6", "bar").get()).isEqualTo("bar");
     assertThat(rxPreferences.getStringSet("foo7", singleton("bar")).get()) //
         .isEqualTo(singleton("bar"));
-    assertThat(rxPreferences.getObject("foo8", new Point(1, 2), pointAdapter).get()) //
+    assertThat(rxPreferences.getObject("foo8", new Point(1, 2), pointConverter).get()) //
         .isEqualTo(new Point(1, 2));
   }
 
@@ -76,7 +80,7 @@ public class PreferenceTest {
     preferences.edit().putBoolean("foo1", false).commit();
     assertThat(rxPreferences.getBoolean("foo1").get()).isEqualTo(false);
     preferences.edit().putString("foo2", "ROCK").commit();
-    assertThat(rxPreferences.getEnum("foo2", Roshambo.class).get()).isEqualTo(ROCK);
+    assertThat(rxPreferences.getEnum("foo2", PAPER, Roshambo.class).get()).isEqualTo(ROCK);
     preferences.edit().putFloat("foo3", 1f).commit();
     assertThat(rxPreferences.getFloat("foo3").get()).isEqualTo(1f);
     preferences.edit().putInt("foo4", 1).commit();
@@ -88,13 +92,14 @@ public class PreferenceTest {
     preferences.edit().putStringSet("foo7", singleton("bar")).commit();
     assertThat(rxPreferences.getStringSet("foo7").get()).isEqualTo(singleton("bar"));
     preferences.edit().putString("foo8", "1,2").commit();
-    assertThat(rxPreferences.getObject("foo8", pointAdapter).get()).isEqualTo(new Point(1, 2));
+    assertThat(rxPreferences.getObject("foo8", new Point(2, 3), pointConverter).get())
+        .isEqualTo(new Point(1, 2));
   }
 
   @Test public void set() {
     rxPreferences.getBoolean("foo1").set(false);
     assertThat(preferences.getBoolean("foo1", true)).isFalse();
-    rxPreferences.getEnum("foo2", Roshambo.class).set(ROCK);
+    rxPreferences.getEnum("foo2", PAPER, Roshambo.class).set(ROCK);
     assertThat(preferences.getString("foo2", null)).isEqualTo("ROCK");
     rxPreferences.getFloat("foo3").set(1f);
     assertThat(preferences.getFloat("foo3", 0f)).isEqualTo(1f);
@@ -106,42 +111,67 @@ public class PreferenceTest {
     assertThat(preferences.getString("foo6", null)).isEqualTo("bar");
     rxPreferences.getStringSet("foo7").set(singleton("bar"));
     assertThat(preferences.getStringSet("foo7", null)).isEqualTo(singleton("bar"));
-    rxPreferences.getObject("foo8", pointAdapter).set(new Point(1, 2));
+    rxPreferences.getObject("foo8", new Point(2, 3), pointConverter).set(new Point(1, 2));
     assertThat(preferences.getString("foo8", null)).isEqualTo("1,2");
   }
 
-  @Test public void setNullDeletes() {
-    preferences.edit().putBoolean("foo1", true).commit();
-    rxPreferences.getBoolean("foo1").set(null);
-    assertThat(preferences.contains("foo1")).isFalse();
+  @SuppressWarnings("ConstantConditions")
+  @Test public void setNullThrows() {
+    try {
+      rxPreferences.getBoolean("foo1").set(null);
+      fail("Disallow setting null.");
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("value == null");
+    }
 
-    preferences.edit().putString("foo2", "ROCK").commit();
-    rxPreferences.getEnum("foo2", Roshambo.class).set(null);
-    assertThat(preferences.contains("foo2")).isFalse();
+    try {
+      rxPreferences.getEnum("foo2", ROCK, Roshambo.class).set(null);
+      fail("Disallow setting null.");
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("value == null");
+    }
 
-    preferences.edit().putFloat("foo3", 1f).commit();
-    rxPreferences.getFloat("foo3").set(null);
-    assertThat(preferences.contains("foo3")).isFalse();
+    try {
+      rxPreferences.getFloat("foo3").set(null);
+      fail("Disallow setting null.");
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("value == null");
+    }
 
-    preferences.edit().putInt("foo4", 1).commit();
-    rxPreferences.getInteger("foo4").set(null);
-    assertThat(preferences.contains("foo4")).isFalse();
+    try {
+      rxPreferences.getInteger("foo4").set(null);
+      fail("Disallow setting null.");
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("value == null");
+    }
 
-    preferences.edit().putLong("foo5", 1L).commit();
-    rxPreferences.getLong("foo5").set(null);
-    assertThat(preferences.contains("foo5")).isFalse();
+    try {
+      rxPreferences.getLong("foo5").set(null);
+      fail("Disallow setting null.");
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("value == null");
+    }
 
-    preferences.edit().putString("foo6", "bar").commit();
-    rxPreferences.getString("foo6").set(null);
-    assertThat(preferences.contains("foo6")).isFalse();
+    try {
+      rxPreferences.getString("foo6").set(null);
+      fail("Disallow setting null.");
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("value == null");
+    }
 
-    preferences.edit().putStringSet("foo7", singleton("bar")).commit();
-    rxPreferences.getStringSet("foo7").set(null);
-    assertThat(preferences.contains("foo7")).isFalse();
+    try {
+      rxPreferences.getStringSet("foo7").set(null);
+      fail("Disallow setting null.");
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("value == null");
+    }
 
-    preferences.edit().putString("foo8", "1,2").commit();
-    rxPreferences.getObject("foo8", pointAdapter).set(null);
-    assertThat(preferences.contains("foo8")).isFalse();
+    try {
+      rxPreferences.getObject("foo8", new Point(1, 2), pointConverter).set(null);
+      fail("Disallow setting null.");
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("value == null");
+    }
   }
 
   @Test public void isSet() {
@@ -167,60 +197,87 @@ public class PreferenceTest {
     assertThat(preferences.contains("foo")).isFalse();
   }
 
+  @Test public void converterMayNotReturnNull() {
+    Preference<Point> preference =
+        rxPreferences.getObject("foo", new Point(0, 0), new Preference.Converter<Point>() {
+          @SuppressWarnings("ConstantConditions")
+          @NonNull @Override public Point deserialize(@NonNull String serialized) {
+            return null;
+          }
+
+          @SuppressWarnings("ConstantConditions")
+          @NonNull @Override public String serialize(@NonNull Point value) {
+            return null;
+          }
+        });
+    preferences.edit().putString("foo", "1,2").apply();
+    try {
+      preference.get();
+      fail("Disallow Converter methods from returning null.");
+    } catch (NullPointerException expected) {
+      assertThat(expected).hasMessage("Deserialized value must not be null from string: 1,2");
+    }
+    try {
+      preference.set(new Point(1, 2));
+      fail("Disallow Converter methods from returning null.");
+    } catch (NullPointerException expected) {
+      assertThat(expected).hasMessage(
+          "Serialized string must not be null from value: Point{x=1, y=2}");
+    }
+  }
+
+  @Test public void stringSetDefaultIsUnmodifiable() {
+    Preference<Set<String>> preference = rxPreferences.getStringSet("foo");
+    Set<String> stringSet = preference.get();
+    try {
+      stringSet.add("");
+      fail(stringSet.getClass() + " should not be modifiable.");
+    } catch (UnsupportedOperationException expected) {
+      assertThat(expected).hasNoCause();
+    }
+  }
+
+  @Test public void stringSetIsUnmodifiable() {
+    Preference<Set<String>> preference = rxPreferences.getStringSet("foo");
+    preference.set(new LinkedHashSet<String>());
+    Set<String> stringSet = preference.get();
+    try {
+      stringSet.add("");
+      fail(stringSet.getClass() + " should not be modifiable.");
+    } catch (UnsupportedOperationException expected) {
+      assertThat(expected).hasNoCause();
+    }
+  }
+
   @Test public void asObservable() {
     Preference<String> preference = rxPreferences.getString("foo", "bar");
 
-    TestSubscriber<String> o = new TestSubscriber<>();
-    Subscription subscription = preference.asObservable().subscribe(o);
-    o.assertValues("bar");
+    RecordingObserver<String> observer = observerRule.create();
+    preference.asObservable().subscribe(observer);
+    observer.assertValue("bar");
 
     preferences.edit().putString("foo", "baz").commit();
-    o.assertValues("bar", "baz");
+    observer.assertValue("baz");
 
     preferences.edit().remove("foo").commit();
-    o.assertValues("bar", "baz", "bar");
-
-    subscription.unsubscribe();
-    preferences.edit().putString("foo", "foo").commit();
-    o.assertValues("bar", "baz", "bar");
+    observer.assertValue("bar");
   }
 
-  @Test public void asObservableHonorsBackpressure() {
-    Preference<String> preference = rxPreferences.getString("foo", "bar");
-
-    TestSubscriber<String> o = new TestSubscriber<>(2); // Request only 2 values.
-    preference.asObservable().subscribe(o);
-    o.assertValues("bar");
-
-    preferences.edit().putString("foo", "baz").commit();
-    o.assertValues("bar", "baz");
-
-    preferences.edit().putString("foo", "foo").commit();
-    o.assertValues("bar", "baz"); // No new item due to backpressure.
-
-    o.requestMore(1);
-    o.assertValues("bar", "baz", "foo");
-
-    for (int i = 0; i < 1000; i++) {
-      preferences.edit().putString("foo", "foo" + i).commit();
-    }
-    o.assertValues("bar", "baz", "foo"); // No new items due to backpressure.
-
-    o.requestMore(Long.MAX_VALUE); // Request everything...
-    o.assertValues("bar", "baz", "foo", "foo999"); // ...but only get latest.
-  }
-
-  @Test public void asAction() {
+  @Test public void asConsumer() throws Exception {
     Preference<String> preference = rxPreferences.getString("foo");
-    Action1<? super String> action = preference.asAction();
+    Consumer<? super String> consumer = preference.asConsumer();
 
-    action.call("bar");
+    consumer.accept("bar");
     assertThat(preferences.getString("foo", null)).isEqualTo("bar");
 
-    action.call("baz");
+    consumer.accept("baz");
     assertThat(preferences.getString("foo", null)).isEqualTo("baz");
 
-    action.call(null);
-    assertThat(preferences.contains("foo")).isFalse();
+    try {
+      consumer.accept(null);
+      fail("Disallow accepting null.");
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("value == null");
+    }
   }
 }

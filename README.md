@@ -14,6 +14,8 @@ SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(co
 RxSharedPreferences rxPreferences = RxSharedPreferences.create(preferences);
 ```
 
+*Hint: Keep a strong reference on your `RxSharedPreferences` instance for as long as you want to observe them to prevent listeners from being GCed.*
+
 Create individual `Preference` objects:
 
 ```java
@@ -35,7 +37,7 @@ Subscribe preferences to streams to store values:
 
 ```java
 RxCompoundButton.checks(showWhatsNewView)
-    .subscribe(showWhatsNew.asAction());
+    .subscribe(showWhatsNew.asConsumer());
 ```
 *(Note: `RxCompoundButton` is from [RxBinding][1])*
 
@@ -44,7 +46,7 @@ Download
 --------
 
 ```groovy
-compile 'com.f2prateek.rx.preferences:rx-preferences:1.0.2'
+compile 'com.f2prateek.rx.preferences2:rx-preferences:2.0.0-RC3'
 ```
 
 

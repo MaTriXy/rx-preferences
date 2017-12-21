@@ -1,9 +1,9 @@
-package com.f2prateek.rx.preferences;
+package com.f2prateek.rx.preferences2;
 
 import android.content.SharedPreferences;
 import android.support.annotation.NonNull;
 
-final class LongAdapter implements Preference.Adapter<Long> {
+final class LongAdapter implements RealPreference.Adapter<Long> {
   static final LongAdapter INSTANCE = new LongAdapter();
 
   @Override public Long get(@NonNull String key, @NonNull SharedPreferences preferences) {
