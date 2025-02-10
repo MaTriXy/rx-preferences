@@ -1,20 +1,24 @@
 package com.f2prateek.rx.preferences2;
 
-import static com.f2prateek.rx.preferences2.Preconditions.checkNotNull;
-
 import android.content.SharedPreferences;
-import android.support.annotation.CheckResult;
-import android.support.annotation.NonNull;
+import androidx.annotation.CheckResult;
+import androidx.annotation.NonNull;
 import io.reactivex.Observable;
 import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
 import io.reactivex.functions.Predicate;
 
+import static com.f2prateek.rx.preferences2.Preconditions.checkNotNull;
+
 final class RealPreference<T> implements Preference<T> {
   /** Stores and retrieves instances of {@code T} in {@link SharedPreferences}. */
   interface Adapter<T> {
-    /** Retrieve the value for {@code key} from {@code preferences}. */
-    T get(@NonNull String key, @NonNull SharedPreferences preferences);
+    /**
+     * Retrieve the value for {@code key} from {@code preferences}, or {@code defaultValue}
+     * if the preference is unset, or was set to {@code null}.
+     */
+    @NonNull T get(@NonNull String key, @NonNull SharedPreferences preferences,
+        @NonNull T defaultValue);
 
     /**
      * Store non-null {@code value} for {@code key} in {@code editor}.
@@ -31,22 +35,26 @@ final class RealPreference<T> implements Preference<T> {
   private final Adapter<T> adapter;
   private final Observable<T> values;
 
-  RealPreference(SharedPreferences preferences, final String key, T defaultValue,
-      Adapter<T> adapter, Observable<String> keyChanges) {
+  RealPreference(SharedPreferences preferences, final String key, final T defaultValue,
+                 Adapter<T> adapter, Observable<String> keyChanges) {
     this.preferences = preferences;
     this.key = key;
     this.defaultValue = defaultValue;
     this.adapter = adapter;
     this.values = keyChanges //
         .filter(new Predicate<String>() {
-          @Override public boolean test(String changedKey) throws Exception {
+          @Override public boolean test(String changedKey) {
             return key.equals(changedKey);
           }
         }) //
         .startWith("<init>") // Dummy value to trigger initial load.
         .map(new Function<String, T>() {
-          @Override public T apply(String s) throws Exception {
-            return get();
+          @Override public T apply(String s) {
+            if(s.equals(RxSharedPreferences.NULL_KEY_EMISSION)) {
+              return defaultValue;
+            } else {
+              return get();
+            }
           }
         });
   }
@@ -60,10 +68,7 @@ final class RealPreference<T> implements Preference<T> {
   }
 
   @Override @NonNull public synchronized T get() {
-    if (!preferences.contains(key)) {
-      return defaultValue;
-    }
-    return adapter.get(key, preferences);
+    return adapter.get(key, preferences, defaultValue);
   }
 
   @Override public void set(@NonNull T value) {
@@ -87,7 +92,7 @@ final class RealPreference<T> implements Preference<T> {
 
   @Override @CheckResult @NonNull public Consumer<? super T> asConsumer() {
     return new Consumer<T>() {
-      @Override public void accept(T value) throws Exception {
+      @Override public void accept(T value) {
         set(value);
       }
     };

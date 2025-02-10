@@ -2,20 +2,24 @@ package com.f2prateek.rx.preferences2;
 
 import android.annotation.SuppressLint;
 import android.content.SharedPreferences;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
+import androidx.test.core.app.ApplicationProvider;
 import io.reactivex.functions.Consumer;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
-import org.robolectric.RuntimeEnvironment;
 
 import static android.preference.PreferenceManager.getDefaultSharedPreferences;
 import static com.f2prateek.rx.preferences2.Roshambo.PAPER;
 import static com.f2prateek.rx.preferences2.Roshambo.ROCK;
+import static java.util.Arrays.asList;
 import static java.util.Collections.singleton;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -31,7 +35,7 @@ public class PreferenceTest {
   private RxSharedPreferences rxPreferences;
 
   @Before public void setUp() {
-    preferences = getDefaultSharedPreferences(RuntimeEnvironment.application);
+    preferences = getDefaultSharedPreferences(ApplicationProvider.getApplicationContext());
     preferences.edit().clear().commit();
     rxPreferences = RxSharedPreferences.create(preferences);
   }
@@ -263,6 +267,21 @@ public class PreferenceTest {
     observer.assertValue("bar");
   }
 
+  @Ignore("Robolectric needs to be updated to support API 30")
+  @Test public void asObservableWhenBackingPrefsCleared() {
+    Preference<String> preference = rxPreferences.getString("foo", "bar");
+
+    RecordingObserver<String> observer = observerRule.create();
+    preference.asObservable().subscribe(observer);
+    observer.assertValue("bar");
+
+    preferences.edit().putString("foo", "baz").commit();
+    observer.assertValue("baz");
+
+    preferences.edit().clear().commit();
+    observer.assertValue("bar");
+  }
+
   @Test public void asConsumer() throws Exception {
     Preference<String> preference = rxPreferences.getString("foo");
     Consumer<? super String> consumer = preference.asConsumer();
@@ -279,5 +298,55 @@ public class PreferenceTest {
     } catch (NullPointerException e) {
       assertThat(e).hasMessage("value == null");
     }
+  }
+
+  @Test public void legacyNullString() {
+    nullValue("string");
+    assertThat(rxPreferences.getString("string", "default").get()).isEqualTo("default");
+  }
+
+  @Test public void legacyNullBoolean() {
+    nullValue("bool");
+    assertThat(rxPreferences.getBoolean("bool", true).get()).isEqualTo(true);
+  }
+
+  @Test public void legacyNullEnum() {
+    nullValue("enum");
+    assertThat(rxPreferences.getEnum("enum", PAPER, Roshambo.class).get()).isEqualTo(PAPER);
+  }
+
+  @Test public void legacyNullFloat() {
+    nullValue("float");
+    assertThat(rxPreferences.getFloat("float", 123.45f).get()).isEqualTo(123.45f);
+  }
+
+  @Test public void legacyNullInteger() {
+    nullValue("int");
+    assertThat(rxPreferences.getInteger("int", 12345).get()).isEqualTo(12345);
+  }
+
+  @Test public void legacyNullLong() {
+    nullValue("long");
+    assertThat(rxPreferences.getLong("long", 12345L).get()).isEqualTo(12345L);
+  }
+
+  @Test public void legacyNullObject() {
+    nullValue("obj");
+    assertThat(rxPreferences.getObject("obj", new Point(10, 11), pointConverter).get())
+        .isEqualTo(new Point(10, 11));
+  }
+
+  @Test public void legacyNullSet() {
+    nullValue("set");
+    List<String> strings = asList("able", "baker", "charlie");
+    HashSet<String> defaultSet = new HashSet<>(strings);
+    HashSet<String> expectedSet = new HashSet<>(strings);
+    assertThat(rxPreferences.getStringSet("key", defaultSet).get()).isEqualTo(expectedSet);
+  }
+
+  private void nullValue(String key) {
+    preferences.edit()
+        .putString(key, null)
+        .commit();
   }
 }

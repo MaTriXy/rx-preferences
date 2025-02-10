@@ -1,3 +1,7 @@
+# DEPRECATED
+
+rx-preferences is deprecated. Please consider using a replacement, such as [this](https://github.com/pablobaxter/rx-preferences). Thank you for using the library!
+
 Rx Preferences
 --------------
 
@@ -46,7 +50,7 @@ Download
 --------
 
 ```groovy
-compile 'com.f2prateek.rx.preferences2:rx-preferences:2.0.0'
+implementation 'com.f2prateek.rx.preferences2:rx-preferences:2.0.1'
 ```
 
 
